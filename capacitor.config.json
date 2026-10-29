@@ -1,0 +1,13 @@
+{
+  "appId": "com.creatorbooth.admin",
+  "appName": "CB Admin",
+  "webDir": "www",
+  "backgroundColor": "#000000",
+  "server": {
+    "url": "https://creator-boot.vercel.app/admin.html",
+    "cleartext": false,
+    "allowNavigation": ["creator-boot.vercel.app"],
+    "errorPath": "offline.html"
+  },
+  "android": { "allowMixedContent": false }
+}

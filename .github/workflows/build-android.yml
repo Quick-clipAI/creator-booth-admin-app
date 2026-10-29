@@ -1,0 +1,90 @@
+name: Build Admin APK
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+
+permissions:
+  contents: write   # publishes the APK to the "latest" release
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Create native Android project
+        run: npx cap add android
+
+      - name: App icon + splash screen from assets/
+        run: npx capacitor-assets generate --android
+
+      - name: Set app version
+        run: |
+          VER=$(node -p "require('./package.json').version")
+          sed -i "s/versionCode 1/versionCode ${{ github.run_number }}/" android/app/build.gradle
+          sed -i "s/versionName \"1.0\"/versionName \"${VER}\"/" android/app/build.gradle
+          grep -n -E "versionCode|versionName" android/app/build.gradle
+
+      - name: Sync web files into Android project
+        run: npx cap sync android
+
+      - name: Build release APK (unsigned)
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon
+
+      # The signing key is created once and kept in the Actions cache so later builds install over the old app.
+      # If GitHub clears the cache (after about 7 days with no build) a new key is made and the app must be
+      # uninstalled once before installing the new file. Add the 4 ANDROID_* secrets (same as the main app repo)
+      # to make the key permanent: they are used when present.
+      - name: Restore signing key cache
+        uses: actions/cache@v4
+        with:
+          path: admin-release.keystore
+          key: admin-signing-key-v1
+
+      - name: Sign APK
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > admin-release.keystore
+          else
+            KS_PASS=cbadmin-local-key; KEY_PASS=$KS_PASS; KEY_ALIAS=cbadmin
+            if [ ! -f admin-release.keystore ]; then
+              keytool -genkeypair -v -keystore admin-release.keystore -alias "$KEY_ALIAS" -keyalg RSA -keysize 2048 -validity 10000 \
+                -storepass "$KS_PASS" -keypass "$KEY_PASS" -dname "CN=Creator Booth Admin, O=Creator Booth"
+            fi
+          fi
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          UNSIGNED=android/app/build/outputs/apk/release/app-release-unsigned.apk
+          "$BT/zipalign" -f -p 4 "$UNSIGNED" aligned.apk
+          "$BT/apksigner" sign --ks admin-release.keystore --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass pass:"$KS_PASS" --key-pass pass:"$KEY_PASS" --out creator-booth-admin.apk aligned.apk
+          "$BT/apksigner" verify creator-booth-admin.apk
+          rm -f aligned.apk
+
+      - name: Save signing key cache
+        uses: actions/cache/save@v4
+        if: always() && hashFiles('admin-release.keystore') != ''
+        with:
+          path: admin-release.keystore
+          key: admin-signing-key-v1
+
+      - name: Publish to the "latest" release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Creator Booth Admin (latest)
+          files: creator-booth-admin.apk
