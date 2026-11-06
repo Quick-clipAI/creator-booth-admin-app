@@ -12,3 +12,7 @@ Only needed if this wrapper changes (icon, name). If a new file will not install
 
 ## Build
 GitHub Actions builds on every push to `main` (Actions → Build Admin APK). No Firebase or other secrets are needed.
+
+## Fingerprint unlock (v1.1.0)
+The admin page asks this app's own plugin (`native/CbBiometricPlugin.java`, added to the generated Android project by the workflow) to keep the admin key in the phone's secure hardware store. The key can only be released with a fingerprint (Android BiometricPrompt), and adding a new fingerprint to the phone invalidates it. Use: sign in with the key once, tap **Fingerprint** at the top of the admin page, approve; next time the app opens with the fingerprint sheet. Leaving the app for 10 seconds locks it again. Needs a fingerprint set up on the phone (Android "strong" biometrics).
+Installing 1.1.0 over 1.0.0 works only while the signing key is still in GitHub's cache; if Android says "app not installed", uninstall CB Admin once and install again.

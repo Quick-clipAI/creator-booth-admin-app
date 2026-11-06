@@ -1,6 +1,6 @@
 {
   "name": "creator-booth-admin-app",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "Android shell for the Creator Booth data-bank admin page (creator-boot.vercel.app/admin.html). The page itself is always the live one, so the app never needs updating when the admin changes.",
   "dependencies": {

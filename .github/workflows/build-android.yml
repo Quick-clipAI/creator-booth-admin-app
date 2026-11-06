@@ -24,6 +24,16 @@ jobs:
       - name: Create native Android project
         run: npx cap add android
 
+      # Fingerprint support: our own small plugin (native/CbBiometricPlugin.java) + the AndroidX biometric library.
+      - name: Add the fingerprint plugin
+        run: |
+          DIR=android/app/src/main/java/com/creatorbooth/admin
+          mkdir -p "$DIR"
+          cp native/CbBiometricPlugin.java native/MainActivity.java "$DIR/"
+          sed -i '/^dependencies {/a\    implementation "androidx.biometric:biometric:1.1.0"' android/app/build.gradle
+          grep -n "biometric" android/app/build.gradle
+          cat "$DIR/MainActivity.java" | head -12
+
       - name: App icon + splash screen from assets/
         run: npx capacitor-assets generate --android
 
